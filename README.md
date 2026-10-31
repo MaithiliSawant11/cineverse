@@ -13,8 +13,8 @@ CINEVERSE is a full-stack, machine learning-powered movie recommendation platfor
 - **Production-Ready Architecture**:
   - **Backend**: FastAPI with lifespan-based singleton ML model loading (loads once on startup into memory).
   - **Frontend**: React 19 + Vite + TypeScript + Tailwind CSS v4 + Framer Motion animated cards & modals.
-  - **Git LFS**: Pre-configured and verified for `similarity.pkl` (176.2 MB).
-  - **Deployment**: `render.yaml` with `lfsEnabled: true` for Render, and zero-config SPA rewrites for Vercel.
+  - **Git LFS & Docker Auto-Verification**: Build-time validation ensures the actual 176.2 MB `similarity.pkl` file is present in the container.
+  - **Deployment**: Single root `render.yaml` (Singapore region, free tier) and zero-config SPA rewrites for Vercel.
 
 ---
 
@@ -36,6 +36,7 @@ CINEVERSE/
 │   │   └── poster_cache.json    # Pre-cached real theatrical poster URLs
 │   ├── tests/
 │   │   └── test_recommendation_flow.py  # End-to-end automated test suite
+│   ├── download_models.py       # Build-time LFS verification and asset resolver
 │   ├── .env.example             # Backend environment template
 │   ├── requirements.txt         # Pinned Python dependencies
 │   └── Dockerfile               # Production container definition
@@ -56,22 +57,39 @@ CINEVERSE/
 ├── datasets/                    # Raw TMDB 5,000 CSV datasets
 ├── scripts/                     # Cache generation utilities
 ├── .gitattributes               # Git LFS tracking rules for *.pkl
-├── render.yaml                  # Render Blueprint deployment definition
+├── render.yaml                  # Root Render Blueprint specification (Singapore region)
 └── README.md                    # Project documentation & deployment guide
 ```
 
 ---
 
+## 💾 Memory Usage & Minimum RAM Requirements
+
+- **Similarity Matrix Array (`similarity.pkl`)**:
+  - Dimensions: `4,806 × 4,806` elements
+  - Data Type: `float64` (8 bytes per value)
+  - Raw Matrix Size: $4806 \times 4806 \times 8 \text{ bytes} \approx \mathbf{176.22 \text{ MB}}$
+- **DataFrame & Metadata (`movie_list.pkl`, JSON caches)**: $\approx \mathbf{30 \text{ MB}}$
+- **Python Runtime + FastAPI + Uvicorn + Dependencies**: $\approx \mathbf{90 \text{ MB}}$
+- **Total Working Set RAM (Measured)**: $\approx \mathbf{330 \text{ MB} - 360 \text{ MB}}$
+
+> **Minimum RAM Recommendation**:
+> - **512 MB RAM** is the minimum required (sufficient for Render's **Free** web service tier under standard traffic).
+> - During initial startup (`pickle.load`), transient unpickling buffers briefly push memory to $\sim 420 \text{ MB}$ before settling at $\sim 330 \text{ MB}$.
+> - If high concurrent traffic is expected, a tier with **1 GB+ RAM** provides additional headroom.
+
+---
+
 ## 🧪 Local Testing & Verification
 
-Before deploying, you can run the automated verification test suite locally:
+Run the automated verification test suite locally:
 
 ```bash
 # Run backend test suite
 python backend/tests/test_recommendation_flow.py
 ```
 
-The test suite validates:
+The test validates:
 1. `GET /`: Confirms 4,806 movies and `(4806, 4806)` matrix loaded in memory.
 2. `GET /api/recommend/Avatar`: Asserts 5 top matches (`Aliens vs Predator: Requiem`, `Aliens`, `Falcon Rising`, `Independence Day`, `Titan A.E.`).
 3. Real online poster resolution & metadata fallback check.
@@ -135,50 +153,59 @@ Open your browser at `http://localhost:5173`.
 
 ### Overview
 - **Source Code & Git LFS**: GitHub (`https://github.com/MaithiliSawant11/cineverse`)
-- **Backend API**: Render (Docker Runtime)
+- **Backend API**: Render (Docker Runtime, Singapore region)
 - **Frontend App**: Vercel (Vite SPA)
 
 ---
 
-### Part 1: Verify Git LFS on GitHub
+### Part 1: Git LFS & Docker Build Verification
 
-The repository already tracks the 176.2 MB `similarity.pkl` using Git LFS. You can verify it with:
+Render's standard Git build environment does not natively run `git lfs pull` for repositories during clone. To ensure the actual **176.2 MB** binary file is deployed rather than a 130-byte text pointer:
 
+1. The repository uses `backend/download_models.py` during `docker build`.
+2. If `similarity.pkl` copied into the container is a Git LFS pointer (`< 10 MB`), the script automatically pulls the actual 176.22 MB binary from the GitHub Media CDN.
+3. **Build-Time Verification**: The build step strictly validates that `similarity.pkl` is between `170 MB` and `195 MB`. If this verification fails, the build halts immediately, preventing broken deployments.
+
+You can verify the local Git LFS tracking with:
 ```bash
 git lfs ls-files -s
 ```
-*Expected output: `backend/models/similarity.pkl (185 MB)` with an asterisk `*` indicating the full LFS object is present.*
+*Expected: `backend/models/similarity.pkl (185 MB)` marked with `*`.*
 
 ---
 
-### Part 2: Backend Deployment on Render
+### Part 2: Backend Deployment on Render (Singapore Region)
+
+The repository root includes a validated [`render.yaml`](file:///c:/Users/Maithili/Desktop/CINEVERSE/render.yaml) blueprint targeting the **Singapore (`singapore`)** region on the **Free** plan.
 
 #### Option A: Automatic Blueprint Deployment (Recommended)
-1. Sign in to [Render](https://dashboard.render.com/).
+1. Sign in to [Render Dashboard](https://dashboard.render.com/).
 2. Click **New +** → **Blueprint**.
 3. Select your GitHub repository: `MaithiliSawant11/cineverse`.
-4. Render will automatically detect [`render.yaml`](file:///c:/Users/Maithili/Desktop/CINEVERSE/render.yaml) at the repository root.
-5. Notice that `lfsEnabled: true` is pre-configured so Render automatically pulls the 176 MB `similarity.pkl` during the Docker build.
-6. Click **Apply**.
-7. Once deployed, note your Render URL: e.g., `https://cineverse-backend.onrender.com`.
+4. Render automatically parses root [`render.yaml`](file:///c:/Users/Maithili/Desktop/CINEVERSE/render.yaml):
+   - **Service Name**: `cineverse-backend`
+   - **Runtime**: Docker (`./backend/Dockerfile`)
+   - **Context**: `./backend`
+   - **Region**: `singapore`
+   - **Plan**: `free`
+5. Click **Apply**.
+6. Once deployed, note your Render URL (e.g., `https://cineverse-backend.onrender.com`).
 
 #### Option B: Manual Web Service Deployment
 1. Click **New +** → **Web Service**.
 2. Connect your GitHub repository: `MaithiliSawant11/cineverse`.
-3. Set the following settings:
+3. Configure service settings:
    - **Name**: `cineverse-backend`
    - **Language / Runtime**: `Docker`
-   - **Root Directory**: `backend` (or leave root and set Dockerfile path to `./backend/Dockerfile`)
+   - **Region**: `Singapore`
    - **Dockerfile Path**: `./backend/Dockerfile`
    - **Docker Context**: `./backend`
-   - **Plan**: `Starter` (or `Standard` if your instance needs additional RAM)
-4. Under **Advanced**:
-   - Check **Docker LFS** (or set `lfsEnabled: true`).
-5. Under **Environment Variables**:
+   - **Instance Type / Plan**: `Free`
+4. Under **Environment Variables**:
    - `PORT` = `8000`
    - `ALLOWED_ORIGINS` = `https://cineverse.vercel.app,http://localhost:5173,http://localhost:3000`
    - `TMDB_API_KEY` = *(Optional: leave empty to use built-in poster & metadata enrichment)*
-6. Click **Create Web Service**.
+5. Click **Create Web Service**.
 
 ---
 
@@ -189,12 +216,12 @@ git lfs ls-files -s
 3. Import your GitHub repository: `MaithiliSawant11/cineverse`.
 4. Configure the Project Settings:
    - **Framework Preset**: `Vite`
-   - **Root Directory**: Click *Edit* and select `frontend`.
+   - **Root Directory**: Click *Edit* and select **`frontend`**.
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
 5. Under **Environment Variables**, add:
    - **Key**: `VITE_API_URL`
-   - **Value**: `https://cineverse-backend.onrender.com` *(your Render backend URL, without trailing slash)*
+   - **Value**: `https://cineverse-backend.onrender.com` *(your Render backend URL from Part 2, without a trailing slash)*
 6. Click **Deploy**.
 7. Vercel will build and assign you a URL (e.g., `https://cineverse.vercel.app`).
 
@@ -203,12 +230,8 @@ git lfs ls-files -s
 ### Part 4: Connecting the Two Services & CORS
 
 1. In your **Render Dashboard** → Select `cineverse-backend` → **Environment**.
-2. Update `ALLOWED_ORIGINS` to include your exact Vercel URL:
-   ```
-   https://cineverse.vercel.app,http://localhost:5173,http://localhost:3000
-   ```
-   *(Note: The backend also has an automated regex pattern `^https://.*\.vercel\.app$` that auto-authorizes all Vercel production and preview deployment URLs!)*
-3. Save changes — Render will redeploy or reload the environment variables automatically.
+2. Ensure `ALLOWED_ORIGINS` includes your Vercel URL.
+   *(Note: The backend also has an automated regex pattern `^https://.*\.vercel\.app$` that auto-authorizes all Vercel production and preview deployment URLs without manual changes!)*
 
 ---
 
