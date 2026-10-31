@@ -1,0 +1,8 @@
+# Git LFS tracking for large model files
+# Install Git LFS first: https://git-lfs.github.com/
+# Then run: git lfs install
+# And: git add .gitattributes && git lfs migrate import --include="*.pkl"
+# Track all pickle files via LFS (similarity.pkl is 176 MB)
+*.pkl filter=lfs diff=lfs merge=lfs -text
+# Explicitly track model directory files
+backend/models/*.pkl filter=lfs diff=lfs merge=lfs -text
