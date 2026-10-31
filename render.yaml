@@ -12,7 +12,7 @@ services:
 
     envVars:
       - key: PORT
-        value: "8000"
+        value: "10000"
       - key: ALLOWED_ORIGINS
         value: "https://cineverse.vercel.app,http://localhost:5173,http://localhost:3000"
       - key: TMDB_API_KEY
