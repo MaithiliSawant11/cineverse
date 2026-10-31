@@ -14,11 +14,12 @@ import type {
   SearchResponse,
 } from '../types';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const RAW_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = RAW_URL.replace(/\/+$/, '');
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,  // 30s — model loading on cold Render start can be slow
+  timeout: 45000,  // 45s — allows for Render free tier spin-up on cold starts
 });
 
 /** Health check — verify backend is alive */

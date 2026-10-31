@@ -59,13 +59,14 @@ app = FastAPI(
 # ── CORS ───────────────────────────────────────────────────────────────────
 _raw_origins = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:5173,http://localhost:3000,http://localhost:4173",
+    "http://localhost:5173,http://localhost:3000,http://localhost:4173,https://cineverse.vercel.app",
 )
 allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",  # Automatically allows all Vercel deployments & preview URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

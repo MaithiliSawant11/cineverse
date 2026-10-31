@@ -1,0 +1,27 @@
+# render.yaml — Render Blueprint specification for CINEVERSE
+# Located at repository root for automatic detection by Render.
+
+services:
+  - type: web
+    name: cineverse-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+
+    # CRITICAL: Enable Git LFS so Render downloads the 176 MB similarity.pkl
+    # Without this, Render clones only the LFS pointer file (~135 bytes).
+    lfsEnabled: true
+
+    plan: starter
+    region: oregon
+
+    envVars:
+      - key: TMDB_API_KEY
+        sync: false        # Optional: Set in Render dashboard if you have a key
+      - key: ALLOWED_ORIGINS
+        # Update with your Vercel URL after deploying the frontend
+        value: "https://cineverse.vercel.app,http://localhost:5173,http://localhost:3000"
+      - key: PORT
+        value: "8000"
+
+    healthCheckPath: /

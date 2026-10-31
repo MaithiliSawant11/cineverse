@@ -4,15 +4,17 @@ CINEVERSE is a full-stack, machine learning-powered movie recommendation platfor
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Highlights
 
-- **Exact ML Engine Preserved**: Uses the pre-computed 4,806 × 4,806 cosine similarity matrix (`similarity.pkl`) without retraining or altering recommendation accuracy.
-- **Configurable TMDB Integration**: Works out-of-the-box **with or without a TMDB API key**. When no key is provided, the platform displays elegant fallback UI states with gradient placeholders for posters, ratings, and overviews.
+- **Exact ML Engine Preserved**: Uses the pre-computed 4,806 × 4,806 cosine similarity matrix (`similarity.pkl`, 176.2 MB) without retraining or altering recommendation results.
+- **Real Theatrical Movie Posters**: Automatically resolves and caches high-definition real movie posters from Wikipedia / Wikimedia Commons REST APIs without requiring an API key.
+- **Rich Metadata Out-of-the-Box**: Real ratings (⭐), release years, plot synopses, runtime, and genres are pre-cached for all 4,803 movies.
+- **Configurable TMDB Key**: Works seamlessly without any API key, while still providing a configurable `TMDB_API_KEY` slot if you want to use personal TMDB credentials later.
 - **Production-Ready Architecture**:
   - **Backend**: FastAPI with lifespan-based singleton ML model loading (loads once on startup into memory).
   - **Frontend**: React 19 + Vite + TypeScript + Tailwind CSS v4 + Framer Motion animated cards & modals.
-  - **Git LFS**: Pre-configured for the 176 MB `similarity.pkl` file.
-  - **Deployment**: Dockerfile + `render.yaml` with `lfsEnabled: true` for Render, and zero-config Vercel support.
+  - **Git LFS**: Pre-configured and verified for `similarity.pkl` (176.2 MB).
+  - **Deployment**: `render.yaml` with `lfsEnabled: true` for Render, and zero-config SPA rewrites for Vercel.
 
 ---
 
@@ -22,20 +24,21 @@ CINEVERSE is a full-stack, machine learning-powered movie recommendation platfor
 CINEVERSE/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI application, CORS, lifespan & endpoints
+│   │   ├── main.py              # FastAPI app, CORS, lifespan & endpoints
 │   │   ├── recommender.py       # ML singleton service (loads .pkl artifacts)
 │   │   ├── models.py            # Pydantic schemas & response validation
-│   │   └── tmdb.py              # Async TMDB API client with graceful fallback
+│   │   └── tmdb.py              # Media enrichment & online poster resolver
 │   ├── models/
 │   │   ├── movie_list.pkl       # 4,806-row DataFrame (movie_id, title, tags)
-│   │   ├── similarity.pkl       # 4,806 × 4,806 cosine similarity matrix (176 MB, Git LFS)
-│   │   └── count_vectorizer.pkl # CountVectorizer vocabulary
+│   │   ├── similarity.pkl       # 4,806 × 4,806 cosine similarity matrix (176.2 MB, Git LFS)
+│   │   ├── count_vectorizer.pkl # CountVectorizer vocabulary
+│   │   ├── movie_metadata.json  # Full metadata (overview, rating, year, runtime, genres)
+│   │   └── poster_cache.json    # Pre-cached real theatrical poster URLs
 │   ├── tests/
 │   │   └── test_recommendation_flow.py  # End-to-end automated test suite
 │   ├── .env.example             # Backend environment template
 │   ├── requirements.txt         # Pinned Python dependencies
-│   ├── Dockerfile               # Container definition for Render / Cloud deploy
-│   └── render.yaml              # Render Blueprint specification
+│   └── Dockerfile               # Production container definition
 │
 ├── frontend/
 │   ├── src/
@@ -47,30 +50,46 @@ CINEVERSE/
 │   ├── .env.example             # Frontend environment template
 │   ├── package.json             # React 19, Tailwind CSS v4, Framer Motion
 │   ├── tsconfig.json            # Strict TypeScript configuration
+│   ├── vercel.json              # Vercel SPA route rewrite rules
 │   └── vite.config.ts           # Vite + Tailwind + React plugin setup
 │
-├── datasets/                    # Reference raw datasets (kept intact)
+├── datasets/                    # Raw TMDB 5,000 CSV datasets
+├── scripts/                     # Cache generation utilities
 ├── .gitattributes               # Git LFS tracking rules for *.pkl
+├── render.yaml                  # Render Blueprint deployment definition
 └── README.md                    # Project documentation & deployment guide
 ```
 
 ---
 
-## 🚀 Running Locally
+## 🧪 Local Testing & Verification
 
-### Prerequisites
-- **Python**: 3.10, 3.11, or 3.13
-- **Node.js**: v18+ or v20+
-- **Git LFS**: [Download Git LFS](https://git-lfs.com/)
+Before deploying, you can run the automated verification test suite locally:
+
+```bash
+# Run backend test suite
+python backend/tests/test_recommendation_flow.py
+```
+
+The test suite validates:
+1. `GET /`: Confirms 4,806 movies and `(4806, 4806)` matrix loaded in memory.
+2. `GET /api/recommend/Avatar`: Asserts 5 top matches (`Aliens vs Predator: Requiem`, `Aliens`, `Falcon Rising`, `Independence Day`, `Titan A.E.`).
+3. Real online poster resolution & metadata fallback check.
+4. `GET /api/recommend/NonExistentMovieXYZ`: Asserts clean HTTP 404 response with an informative error message.
+5. `GET /api/movies/search?q=Dark%20Knight`: Verifies autocomplete and title substring search.
+6. `GET /api/movies/19995`: Verifies movie detail retrieval.
+7. `GET /api/genres`: Verifies genre taxonomy.
 
 ---
+
+## 🚀 Running Locally
 
 ### 1. Backend Setup
 
 ```bash
 cd backend
 
-# Create virtual environment (recommended)
+# Create and activate a virtual environment
 python -m venv venv
 # Windows:
 .\venv\Scripts\activate
@@ -80,33 +99,16 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables
-# Copy .env.example to .env
+# Create .env from template
 cp .env.example .env
-```
 
-Edit `backend/.env` (optional):
-```ini
-# TMDB API Key (optional): leave as placeholder for graceful fallback mode
-TMDB_API_KEY=your_tmdb_api_key_here
-
-# Allowed origins for CORS (default covers Vite standard ports)
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:4173
-
-# Port
-PORT=8000
-```
-
-Start the FastAPI server:
-```bash
+# Start server
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
 - API Base URL: `http://localhost:8000`
 - Interactive Swagger UI: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/`
-
----
 
 ### 2. Frontend Setup
 
@@ -115,20 +117,13 @@ In a new terminal window:
 ```bash
 cd frontend
 
-# Install npm dependencies
+# Install dependencies
 npm install
 
-# Create local environment file
+# Create .env from template
 cp .env.example .env
-```
 
-Ensure `frontend/.env` points to the local backend:
-```ini
-VITE_API_URL=http://localhost:8000
-```
-
-Start the Vite development server:
-```bash
+# Start development server
 npm run dev
 ```
 
@@ -136,65 +131,84 @@ Open your browser at `http://localhost:5173`.
 
 ---
 
-## 🧪 Testing the Recommendation Flow
+## 🌐 Deployment Guide
 
-Run the comprehensive test suite to verify model loading, recommendations, search, TMDB fallbacks, and error handling:
-
-```bash
-python backend/tests/test_recommendation_flow.py
-```
-
-The test validates:
-1. `GET /`: Confirms 4,806 movies and `(4806, 4806)` matrix loaded in memory.
-2. `GET /api/recommend/Avatar`: Asserts 5 top matches (`Aliens vs Predator: Requiem`, `Aliens`, `Falcon Rising`, `Independence Day`, `Titan A.E.`).
-3. Graceful fallback: Verifies responses remain stable and typed when TMDB metadata is unavailable.
-4. `GET /api/recommend/InvalidMovie123`: Asserts clean HTTP 404 response with an informative error message.
-5. `GET /api/movies/search?q=Dark%20Knight`: Verifies autocomplete and substring search.
-6. `GET /api/movies/19995`: Verifies movie detail retrieval.
+### Overview
+- **Source Code & Git LFS**: GitHub (`https://github.com/MaithiliSawant11/cineverse`)
+- **Backend API**: Render (Docker Runtime)
+- **Frontend App**: Vercel (Vite SPA)
 
 ---
 
-## 🌐 Deployment Instructions
+### Part 1: Verify Git LFS on GitHub
 
-### Backend Deployment (Render)
+The repository already tracks the 176.2 MB `similarity.pkl` using Git LFS. You can verify it with:
 
-The backend includes a pre-configured `Dockerfile` and `backend/render.yaml`. Because `similarity.pkl` is 176 MB, Git LFS must be used.
-
-#### Step 1: Ensure Git LFS is Active in Your Repository
 ```bash
-git lfs install
-git add .gitattributes
-git add backend/models/*.pkl
-git commit -m "Configure Git LFS for model pickle files"
-git push origin main
+git lfs ls-files -s
 ```
+*Expected output: `backend/models/similarity.pkl (185 MB)` with an asterisk `*` indicating the full LFS object is present.*
 
-#### Step 2: Deploy on Render
-1. Log in to [Render](https://render.com/).
-2. Click **New +** → **Blueprint** (or **Web Service**).
-3. Connect your GitHub repository.
-4. Render will read `backend/render.yaml` automatically:
-   - **Runtime**: Docker
-   - **Docker Context**: `./backend`
+---
+
+### Part 2: Backend Deployment on Render
+
+#### Option A: Automatic Blueprint Deployment (Recommended)
+1. Sign in to [Render](https://dashboard.render.com/).
+2. Click **New +** → **Blueprint**.
+3. Select your GitHub repository: `MaithiliSawant11/cineverse`.
+4. Render will automatically detect [`render.yaml`](file:///c:/Users/Maithili/Desktop/CINEVERSE/render.yaml) at the repository root.
+5. Notice that `lfsEnabled: true` is pre-configured so Render automatically pulls the 176 MB `similarity.pkl` during the Docker build.
+6. Click **Apply**.
+7. Once deployed, note your Render URL: e.g., `https://cineverse-backend.onrender.com`.
+
+#### Option B: Manual Web Service Deployment
+1. Click **New +** → **Web Service**.
+2. Connect your GitHub repository: `MaithiliSawant11/cineverse`.
+3. Set the following settings:
+   - **Name**: `cineverse-backend`
+   - **Language / Runtime**: `Docker`
+   - **Root Directory**: `backend` (or leave root and set Dockerfile path to `./backend/Dockerfile`)
    - **Dockerfile Path**: `./backend/Dockerfile`
-   - **lfsEnabled**: `true` *(ensures Render pulls the 176 MB file instead of just the pointer)*
-5. In the Render Environment Variables settings:
-   - `TMDB_API_KEY`: *(Optional)* Paste your key from [TMDB Settings](https://www.themoviedb.org/settings/api). If left empty, graceful fallbacks will automatically be used.
-   - `ALLOWED_ORIGINS`: Add your deployed frontend URL (e.g., `https://cineverse.vercel.app`).
-6. Deploy! Render will build the Docker container and expose your API (e.g., `https://cineverse-backend.onrender.com`).
+   - **Docker Context**: `./backend`
+   - **Plan**: `Starter` (or `Standard` if your instance needs additional RAM)
+4. Under **Advanced**:
+   - Check **Docker LFS** (or set `lfsEnabled: true`).
+5. Under **Environment Variables**:
+   - `PORT` = `8000`
+   - `ALLOWED_ORIGINS` = `https://cineverse.vercel.app,http://localhost:5173,http://localhost:3000`
+   - `TMDB_API_KEY` = *(Optional: leave empty to use built-in poster & metadata enrichment)*
+6. Click **Create Web Service**.
 
 ---
 
-### Frontend Deployment (Vercel)
+### Part 3: Frontend Deployment on Vercel
 
-1. Push your repository to GitHub.
-2. Go to [Vercel](https://vercel.com/) and click **Add New...** → **Project**.
-3. Select your repository.
-4. Set the **Root Directory** to `frontend`.
-5. Set the **Framework Preset** to `Vite`.
-6. Under **Environment Variables**, add:
-   - `VITE_API_URL` = `https://cineverse-backend.onrender.com` (your Render backend URL)
-7. Click **Deploy**.
+1. Sign in to [Vercel](https://vercel.com/).
+2. Click **Add New...** → **Project**.
+3. Import your GitHub repository: `MaithiliSawant11/cineverse`.
+4. Configure the Project Settings:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: Click *Edit* and select `frontend`.
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+5. Under **Environment Variables**, add:
+   - **Key**: `VITE_API_URL`
+   - **Value**: `https://cineverse-backend.onrender.com` *(your Render backend URL, without trailing slash)*
+6. Click **Deploy**.
+7. Vercel will build and assign you a URL (e.g., `https://cineverse.vercel.app`).
+
+---
+
+### Part 4: Connecting the Two Services & CORS
+
+1. In your **Render Dashboard** → Select `cineverse-backend` → **Environment**.
+2. Update `ALLOWED_ORIGINS` to include your exact Vercel URL:
+   ```
+   https://cineverse.vercel.app,http://localhost:5173,http://localhost:3000
+   ```
+   *(Note: The backend also has an automated regex pattern `^https://.*\.vercel\.app$` that auto-authorizes all Vercel production and preview deployment URLs!)*
+3. Save changes — Render will redeploy or reload the environment variables automatically.
 
 ---
 
@@ -203,9 +217,9 @@ git push origin main
 | Method | Endpoint | Description | Query / Path Params |
 |---|---|---|---|
 | `GET` | `/` | Health check & model status | None |
-| `GET` | `/api/movies/search` | Search movie titles | `q` (string, required), `limit` (int, default 20) |
+| `GET` | `/api/movies/search` | Search movie titles with real posters | `q` (string, required), `limit` (int, default 20) |
 | `GET` | `/api/movies/{movie_id}` | Detailed movie information | `movie_id` (int, TMDB ID) |
-| `GET` | `/api/recommend/{title}` | Top 5 AI recommendations | `title` (string, movie title) |
+| `GET` | `/api/recommend/{title}` | Top 5 AI recommendations with posters | `title` (string, movie title) |
 | `GET` | `/api/genres` | Available genres list | None |
 
 ---
