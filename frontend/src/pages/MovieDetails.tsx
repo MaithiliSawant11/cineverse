@@ -106,12 +106,23 @@ export default function MovieDetails() {
           >
             {/* Poster */}
             <div className="shrink-0">
-              <div className="w-48 md:w-64 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10">
-                <img
-                  src={movie?.poster_path || `https://placehold.co/300x450/1a1a2e/c9a84c?text=${encodeURIComponent(displayTitle)}`}
-                  alt={displayTitle}
-                  className="w-full h-auto"
-                />
+              <div className="w-48 md:w-64 aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-neutral-900 flex items-center justify-center">
+                {movie?.poster_path ? (
+                  <img
+                    src={movie.poster_path}
+                    alt={displayTitle}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full p-6 flex flex-col items-center justify-center text-center bg-gradient-to-b from-neutral-800 to-neutral-950">
+                    <div className="w-16 h-16 rounded-full bg-gold-400/10 border border-gold-400/20 flex items-center justify-center mb-4 text-gold-400">
+                      <Sparkles size={28} />
+                    </div>
+                    <p className="text-white font-semibold text-sm leading-snug line-clamp-3 font-display">
+                      {displayTitle}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -108,7 +108,7 @@ async def search_movies(
     import asyncio
 
     async def enrich(item: dict) -> MovieBrief:
-        brief = await tmdb_client.fetch_movie_brief(item["movie_id"])
+        brief = await tmdb_client.fetch_movie_brief(item["movie_id"], item["title"])
         return MovieBrief(
             movie_id=item["movie_id"],
             title=item["title"],
@@ -140,7 +140,7 @@ async def get_movie(movie_id: int):
         raise HTTPException(status_code=404, detail=f"Movie with id {movie_id} not found in dataset")
 
     # Try TMDB enrichment
-    tmdb_data = await tmdb_client.fetch_movie_details(movie_id)
+    tmdb_data = await tmdb_client.fetch_movie_details(movie_id, local["title"])
     if tmdb_data:
         return MovieDetail(**tmdb_data)
 
@@ -176,7 +176,7 @@ async def get_recommendations(movie_title: str, top_n: int = Query(5, ge=1, le=2
     import asyncio
 
     async def enrich_rec(rec: dict) -> RecommendationItem:
-        brief = await tmdb_client.fetch_movie_brief(rec["movie_id"])
+        brief = await tmdb_client.fetch_movie_brief(rec["movie_id"], rec["title"])
         return RecommendationItem(
             rank=rec["rank"],
             movie_id=rec["movie_id"],
